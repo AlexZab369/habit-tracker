@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Трекер привычек</title>
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Трекер">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%85%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0f1115; --surface: #181b22; --surface-2: #1f232c; --border: #2a2f3a;
+    --text: #e6e8ee; --text-dim: #8b93a7; --accent: #4ade80;
+    --accent-soft: rgba(74,222,128,0.15); --radius: 14px;
+    --shadow: 0 10px 30px rgba(0,0,0,0.35); --gradient-top: #1a2030;
+    --lavender: #b39ddb; --lavender-soft: rgba(179,157,219,0.15);
+  }
+  body.light {
+    --bg: #f5f7fb; --surface: #ffffff; --surface-2: #eef1f7; --border: #dde2ec;
+    --text: #1a1f2b; --text-dim: #6b7280; --accent: #16a34a;
+    --accent-soft: rgba(22,163,74,0.12); --shadow: 0 10px 30px rgba(20,30,60,0.08);
+    --gradient-top: #e6ecf7; --lavender: #7e57c2; --lavender-soft: rgba(126,87,194,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, var(--gradient-top) 0%, var(--bg) 60%);
+    color: var(--text); min-height: 100vh; padding: 32px 16px 64px;
+    display: flex; justify-content: center;
+    transition: background .3s ease, color .3s ease;
+  }
+  .app { width: 100%; max-width: 980px; }
+
+  header { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .progress-block {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 12px 18px; border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .progress-text { font-size: .85rem; color: var(--text-dim); white-space: nowrap; }
+  .progress-text b { color: var(--text); font-size: 1rem; }
+  .progress-bar { width: 160px; height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, var(--accent)); border-radius: 99px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+
+  .quote-banner {
+    display: flex; align-items: center; gap: 16px;
+    background: linear-gradient(135deg, var(--lavender-soft), transparent 65%);
+    border: 1px solid var(--border); border-left: 4px solid var(--lavender);
+    border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .quote-emoji { font-size: 1.8rem; line-height: 1; flex-shrink: 0; }
+  .quote-body { flex: 1; min-width: 0; }
+  .quote-text { font-size: .98rem; line-height: 1.45; font-weight: 500; color: var(--lavender); }
+  .quote-text::before { content: "«"; } .quote-text::after { content: "»"; }
+  .quote-author { font-size: .78rem; color: var(--text-dim); margin-top: 6px; }
+
+  .week-nav {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .week-nav .label { font-size: .9rem; font-weight: 600; }
+  .week-nav .label small { display: block; font-weight: 400; font-size: .72rem; color: var(--text-dim); margin-top: 2px; }
+  .week-nav .nav-btns { display: flex; gap: 8px; }
+  .nav-btn { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 700; }
+  .nav-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  .tracker {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    overflow: auto; max-height: 70vh;
+  }
+  .grid { display: grid; grid-template-columns: minmax(180px, 1.8fr) repeat(7, minmax(56px, 1fr)); min-width: 640px; }
+  .cell {
+    display: flex; align-items: center; justify-content: center;
+    padding: 14px 8px; border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    font-size: .9rem; min-height: 56px;
+  }
+  .cell:nth-child(8n) { border-right: none; }
+  .head {
+    background: var(--surface-2); font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; font-size: .72rem; letter-spacing: .06em;
+    position: sticky; top: 0; z-index: 2;
+  }
+  .head.today { color: var(--accent); background: var(--accent-soft); }
+  .habit-name { justify-content: flex-start; padding-left: 16px; gap: 8px; font-weight: 500; flex-wrap: wrap; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+  .head.habit-name { z-index: 3; }
+  .habit-meta { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .habit-input {
+    background: transparent; border: none; color: var(--text); font: inherit;
+    font-weight: 500; width: 100%; padding: 4px 6px; border-radius: 8px;
+    outline: none; transition: background .2s; min-width: 0;
+  }
+  .habit-input:hover { background: var(--surface-2); }
+  .habit-input:focus { background: var(--surface-2); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .counter { font-size: .72rem; color: var(--text-dim); background: var(--surface-2); padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .counter.done { color: var(--accent); background: var(--accent-soft); }
+  .streak { font-size: .72rem; color: #fbbf24; background: rgba(251,191,36,.12); padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+  .del-btn {
+    width: 26px; height: 26px; padding: 0; border-radius: 8px; font-size: .85rem;
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .del-btn:hover { color: #ef4444; border-color: #ef4444; background: rgba(239,68,68,.08); }
+
+  .day { cursor: pointer; user-select: none; padding: 6px; }
+  .box {
+    width: 34px; height: 34px; border-radius: 10px; border: 2px solid var(--border);
+    background: var(--surface-2); display: flex; align-items: center; justify-content: center;
+    transition: transform .15s ease, background .2s, border-color .2s;
+  }
+  .box svg { width: 18px; height: 18px; stroke: var(--accent); stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset .3s ease .05s; }
+  .day:hover .box { border-color: var(--accent); transform: translateY(-1px); }
+  .day.checked .box { background: var(--accent-soft); border-color: var(--accent); }
+  .day.checked .box svg { stroke-dashoffset: 0; }
+  @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.18)} 100%{transform:scale(1)} }
+  .day.just-checked .box { animation: pop .32s ease; }
+  .day.today { background: var(--accent-soft); }
+  .row-enter { animation: rowIn .25s ease; }
+  @keyframes rowIn { from{opacity:0; transform:translateY(-4px)} to{opacity:1; transform:none} }
+
+  .chart-section {
+    margin-top: 22px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px;
+  }
+  .chart-title { font-size: .85rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
+  .chart { display: flex; gap: 10px; align-items: flex-end; height: 140px; padding: 0 4px; }
+  .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+  .bar { width: 100%; background: linear-gradient(180deg, var(--accent), #22c55e); border-radius: 6px 6px 0 0; min-height: 3px; transition: height .5s cubic-bezier(.4,0,.2,1); }
+  .bar.current { box-shadow: 0 0 0 2px var(--accent-soft), 0 0 0 3px var(--accent); }
+  .bar-label { font-size: .68rem; color: var(--text-dim); white-space: nowrap; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; justify-content: flex-end; align-items: center; }
+  .actions .spacer { flex: 1; }
+  button {
+    font: inherit; font-weight: 600; font-size: .9rem; padding: 11px 20px;
+    border-radius: 12px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; transition: background .2s, border-color .2s, transform .1s;
+  }
+  button:hover { background: var(--surface-2); }
+  button:active { transform: scale(.97); }
+  button.primary { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .theme-toggle { width: 44px; height: 44px; padding: 0; font-size: 1.15rem; border-radius: 50%; }
+
+  /* Модалка настроек */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none;
+    align-items: center; justify-content: center; z-index: 100; padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); width: 100%; max-width: 460px; padding: 22px;
+    max-height: 90vh; overflow: auto;
+  }
+  .modal h2 { font-size: 1.1rem; margin-bottom: 16px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: .82rem; color: var(--text-dim); margin-bottom: 6px; }
+  .field select, .field textarea, .field input[type=number] {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 11px; border-radius: 10px; font: inherit;
+  }
+  .field textarea { resize: vertical; min-height: 70px; font-size: .8rem; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+
+  /* Тосты */
+  .toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 200; pointer-events: none; }
+  .toast {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 11px 16px; border-radius: 12px; box-shadow: var(--shadow);
+    font-size: .88rem; opacity: 0; transform: translateY(8px);
+    transition: opacity .2s, transform .2s; pointer-events: auto;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.error { border-color: #ef4444; color: #fca5a5; }
+  .toast.success { border-color: var(--accent); color: var(--accent); }
+
+  /* Пустое состояние */
+  .empty {
+    padding: 40px 20px; text-align: center; color: var(--text-dim);
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .empty .emoji { font-size: 2.4rem; }
+
+  @media (max-width: 720px) {
+    body { padding: 20px 10px 48px; }
+    h1 { font-size: 1.3rem; }
+    .grid { grid-template-columns: minmax(150px, 1.6fr) repeat(7, minmax(44px, 1fr)); min-width: 560px; font-size: .8rem; }
+    .cell { padding: 10px 4px; min-height: 50px; }
+    .habit-name { padding-left: 8px; gap: 6px; }
+    .habit-input { font-size: .8rem; }
+    .counter, .streak { display: none; }
+    .box { width: 28px; height: 28px; border-radius: 8px; }
+    .box svg { width: 14px; height: 14px; }
+    .progress-bar { width: 100px; }
+    .progress-block { padding: 10px 14px; }
+    .chart { height: 110px; gap: 6px; }
+    .bar-label { font-size: .6rem; }
+    .quote-banner { padding: 12px 14px; gap: 12px; }
+    .quote-emoji { font-size: 1.4rem; }
+    .quote-text { font-size: .88rem; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Трекер <span>привычек</span></h1>
+    <div class="header-right">
+      <div class="progress-block">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-text">Неделя: <b id="progressPct">0%</b></div>
+      </div>
+      <button class="theme-toggle" id="themeBtn" title="Сменить тему" aria-label="Сменить тему">🌙</button>
+    </div>
+  </header>
+
+  <div class="quote-banner" id="quoteBanner">
+    <span class="quote-emoji" id="quoteEmoji">💪</span>
+    <div class="quote-body">
+      <p class="quote-text" id="quoteText"></p>
+      <p class="quote-author" id="quoteAuthor"></p>
+    </div>
+  </div>
+
+  <div class="week-nav">
+    <div class="label">
+      <span id="weekTitle">Текущая неделя</span>
+      <small id="weekRange"></small>
+    </div>
+    <div class="nav-btns">
+      <button class="nav-btn" id="prevWeek" title="Предыдущая неделя" aria-label="Предыдущая неделя">‹</button>
+      <button class="nav-btn" id="nextWeek" title="Следующая неделя" aria-label="Следующая неделя">›</button>
+    </div>
+  </div>
+
+  <div class="tracker" id="tracker">
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="emptyState" hidden>
+      <div class="emoji">🌱</div>
+      <div>Пока нет привычек. Добавьте первую!</div>
+      <button class="primary" id="emptyAddBtn">+ Добавить привычку</button>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-title">Прогресс за 8 недель</div>
+    <div class="chart" id="chart"></div>
+  </div>
+
+  <div class="actions">
+    <button id="addHabitBtn" class="primary" title="Добавить привычку">+ Привычка</button>
+    <button id="settingsBtn" title="Настройки">⚙ Настройки</button>
+    <span class="spacer"></span>
+    <button id="exportBtn" title="Скачать JSON">⬇ JSON</button>
+    <button id="exportCsvBtn" title="Скачать CSV">⬇ CSV</button>
+    <button id="importBtn" title="Загрузить JSON">⬆ Импорт</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </div>
+</div>
+
+<!-- Модалка настроек -->
+<div class="modal-backdrop" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <div class="modal">
+    <h2 id="settingsTitle">Настройки</h2>
+    <div class="field">
+      <label for="firstDay">Первый день недели</label>
+      <select id="firstDay">
+        <option value="1">Понедельник</option>
+        <option value="0">Воскресенье</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="streakThreshold">Порог стрика (дней из 7)</label>
+      <input type="number" id="streakThreshold" min="1" max="7" step="1">
+    </div>
+    <div class="field">
+      <label for="customQuotes">Свои цитаты (JSON-массив объектов {emoji,text,author}; пусто — встроенные)</label>
+      <textarea id="customQuotes" placeholder='[{"emoji":"🌟","text":"...","author":"..."}]'></textarea>
+    </div>
+    <div class="modal-actions">
+      <button id="settingsCancel">Отмена</button>
+      <button id="settingsSave" class="primary">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* =========================================================
+   Трекер привычек — финальная версия
+   - Исправлены баги (getStreak, todayColumnIndex, импорт)
+   - Добавлены: добавление/удаление привычек, настройки,
+     свайпы, CSV-экспорт, тосты, пустое состояние, PWA
+   - Обратная совместимость со старым форматом state
+   ========================================================= */
+document.addEventListener("DOMContentLoaded", () => {
+  /* ---------- Константы ---------- */
+  const STORAGE_KEY = "habit-tracker-final";
+  const THEME_KEY = "habit-tracker-theme";
+  const SETTINGS_KEY = "habit-tracker-settings";
+  const DAYS_RU_MON = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+  const DAYS_RU_SUN = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
+  const TOTAL_DAYS = 7;
+  const MAX_HABITS = 20;
+  const CHART_WEEKS = 8;
+  const MAX_WEEKS_SHIFT = 52;
+
+  const DEFAULT_HABITS = ["Вода 2 л","Зарядка","Чтение","Медитация","Без сахара","Прогулка","Сон до 23:00"];
+
+  const QUOTES = [
+    { emoji:"🚀", text:"Понедельник — это не начало проблемы, это начало решения.", author:"Народная мудрость" },
+    { emoji:"🌱", text:"Ты не поднимаешься до уровня своих целей. Ты опускаешься до уровня своих систем.", author:"Джеймс Клир" },
+    { emoji:"🔥", text:"Дисциплина — это выбор между тем, что ты хочешь сейчас, и тем, что хочешь больше всего.", author:"Огастес Ф. Хоу" },
+    { emoji:"💧", text:"Маленькие ежедневные улучшения приводят к ошеломляющим результатам.", author:"Робин Шарма" },
+    { emoji:"⭐", text:"Мы — то, что мы делаем постоянно. Совершенство не действие, а привычка.", author:"Аристотель" },
+    { emoji:"🌿", text:"Не жди вдохновения. Начни — и вдохновение догонит тебя.", author:"Неизвестный автор" },
+    { emoji:"🎯", text:"Успех — это сумма небольших усилий, повторяемых день за днём.", author:"Роберт Кольер" }
+  ];
+
+  /* ---------- Кэш DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    grid: $("grid"), tracker: $("tracker"), emptyState: $("emptyState"),
+    emptyAddBtn: $("emptyAddBtn"),
+    progressFill: $("progressFill"), progressPct: $("progressPct"),
+    themeBtn: $("themeBtn"), prevBtn: $("prevWeek"), nextBtn: $("nextWeek"),
+    weekTitle: $("weekTitle"), weekRange: $("weekRange"),
+    exportBtn: $("exportBtn"), exportCsvBtn: $("exportCsvBtn"),
+    importBtn: $("importBtn"), importFile: $("importFile"),
+    addHabitBtn: $("addHabitBtn"), settingsBtn: $("settingsBtn"),
+    settingsModal: $("settingsModal"), firstDay: $("firstDay"),
+    streakThreshold: $("streakThreshold"), customQuotes: $("customQuotes"),
+    settingsSave: $("settingsSave"), settingsCancel: $("settingsCancel"),
+    chart: $("chart"), quoteEmoji: $("quoteEmoji"), quoteText: $("quoteText"),
+    quoteAuthor: $("quoteAuthor"), toastContainer: $("toastContainer")
+  };
+
+  /* ---------- Безопасный localStorage (фолбэк в память) ---------- */
+  const memStore = {};
+  const storage = {
+    get(k) { try { return localStorage.getItem(k); } catch { return memStore[k] ?? null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { memStore[k] = v; } },
+    remove(k) { try { localStorage.removeItem(k); } catch { delete memStore[k]; } }
+  };
+
+  /* ---------- Тосты ---------- */
+  function toast(msg, type = "") {
+    const t = document.createElement("div");
+    t.className = "toast " + type;
+    t.textContent = msg;
+    el.toastContainer.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("show"));
+    setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(() => t.remove(), 250);
+    }, 2600);
+  }
+
+  /* ---------- Настройки ---------- */
+  let settings = loadSettings();
+  function loadSettings() {
+    const def = { firstDay: 1, streakThreshold: 5, customQuotes: null };
+    try {
+      const raw = storage.get(SETTINGS_KEY);
+      if (!raw) return def;
+      const p = JSON.parse(raw);
+      return {
+        firstDay: p.firstDay === 0 ? 0 : 1,
+        streakThreshold: Math.min(7, Math.max(1, parseInt(p.streakThreshold, 10) || 5)),
+        customQuotes: Array.isArray(p.customQuotes) && p.customQuotes.length ? p.customQuotes : null
+      };
+    } catch { return def; }
+  }
+  function saveSettings() { storage.set(SETTINGS_KEY, JSON.stringify(settings)); }
+  function activeQuotes() { return settings.customQuotes || QUOTES; }
+  function dayLabels() { return settings.firstDay === 1 ? DAYS_RU_MON : DAYS_RU_SUN; }
+
+  /* ---------- Дата-утилиты ---------- */
+  function startOfWeek(d) {
+    const date = new Date(d);
+    date.setHours(0,0,0,0);
+    const jsDay = date.getDay(); // 0=Вс..6=Сб
+    const first = settings.firstDay; // 0 или 1
+    const diff = (jsDay - first + 7) % 7;
+    date.setDate(date.getDate() - diff);
+    return date;
+  }
+  function weekKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${dd}`;
+  }
+  function fmtDate(d) { return d.toLocaleDateString("ru-RU", { day:"numeric", month:"short" }); }
+
+  /* ---------- Состояние ---------- */
+  let state = loadState();
+
+  function normalizeHabit(h) {
+    const weeks = (h && typeof h.weeks === "object" && h.weeks) ? {} : {};
+    if (h && h.weeks && typeof h.weeks === "object") {
+      for (const k in h.weeks) {
+        const arr = h.weeks[k];
+        if (Array.isArray(arr) && arr.length === TOTAL_DAYS) {
+          weeks[k] = arr.map(v => !!v);
+        }
+      }
+    }
+    return { name: typeof h?.name === "string" ? h.name : "", weeks };
+  }
+
+  function loadState() {
+    try {
+      const raw = storage.get(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.habits) && parsed.habits.length >= 1) {
+          return {
+            offset: Number.isInteger(parsed.offset) ? parsed.offset : 0,
+            habits: parsed.habits.slice(0, MAX_HABITS).map(normalizeHabit)
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("Не удалось прочитать сохранённые данные:", e);
+    }
+    // Миграция старого формата: ровно 7 привычек
+    return { offset: 0, habits: DEFAULT_HABITS.map(name => ({ name, weeks: {} })) };
+  }
+
+  function saveState() { storage.set(STORAGE_KEY, JSON.stringify(state)); }
+
+  function currentWeekStart() {
+    const s = startOfWeek(new Date());
+    s.setDate(s.getDate() + state.offset * 7);
+    return s;
+  }
+  function todayColumnIndex() {
+    if (state.offset !== 0) return -1;
+    const js = new Date().getDay();
+    return (js - settings.firstDay + 7) % 7;
+  }
+  function getWeekDays(habit) {
+    const key = weekKey(currentWeekStart());
+    const arr = habit.weeks[key];
+    if (!Array.isArray(arr) || arr.length !== TOTAL_DAYS) {
+      habit.weeks[key] = Array(TOTAL_DAYS).fill(false);
+    }
+    return habit.weeks[key];
+  }
+
+  /* ---------- Стрик (исправлено: без мутации общего Date) ---------- */
+  function getStreak(habit) {
+    const threshold = settings.streakThreshold;
+    let streak = 0;
+    const cur = startOfWeek(new Date());
+    const curDays = habit.weeks[weekKey(cur)] || [];
+    if (curDays.filter(Boolean).length >= threshold) streak += 1;
+    // Прошлые недели: копируем дату на каждой итерации
+    for (let i = 1; i < 104; i++) {
+      const m = new Date(cur);
+      m.setDate(m.getDate() - 7 * i);
+      const days = habit.weeks[weekKey(m)] || [];
+      if (days.filter(Boolean).length >= threshold) streak += 1;
+      else break;
+    }
+    return streak;
+  }
+  function totalChecked() {
+    return state.habits.reduce((sum, h) => sum + getWeekDays(h).filter(Boolean).length, 0);
+  }
+
+  /* ---------- Рендер ---------- */
+  const CHECK_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5 L9.5 18 L20 6"></path></svg>`;
+
+  function render() {
+    const tIdx = todayColumnIndex();
+    el.grid.innerHTML = "";
+    const labels = dayLabels();
+
+    // Шапка
+    const corner = document.createElement("div");
+    corner.className = "cell head habit-name";
+    corner.textContent = "Привычка";
+    el.grid.appendChild(corner);
+
+    labels.forEach((label, i) => {
+      const d = document.createElement("div");
+      d.className = "cell head" + (i === tIdx ? " today" : "");
+      d.textContent = label;
+      el.grid.appendChild(d);
+    });
+
+    // Строки
+    state.habits.forEach((habit, hIdx) => {
+      const days = getWeekDays(habit);
+
+      const nameCell = document.createElement("div");
+      nameCell.className = "cell habit-name row-enter";
+
+      const input = document.createElement("input");
+      input.className = "habit-input";
+      input.value = habit.name;
+      input.placeholder = "Привычка " + (hIdx + 1);
+      input.maxLength = 40;
+      input.setAttribute("aria-label", "Название привычки " + (hIdx + 1));
+      input.addEventListener("input", () => { habit.name = input.value; saveState(); });
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+
+      const meta = document.createElement("div");
+      meta.className = "habit-meta";
+
+      const doneCount = days.filter(Boolean).length;
+      const counter = document.createElement("span");
+      counter.className = "counter" + (doneCount === TOTAL_DAYS ? " done" : "");
+      counter.textContent = `${doneCount}/${TOTAL_DAYS}`;
+      meta.appendChild(counter);
+
+      const streakVal = getStreak(habit);
+      if (streakVal > 0) {
+        const s = document.createElement("span");
+        s.className = "streak";
+        s.textContent = `🔥${streakVal}`;
+        s.title = `Стрик: ${streakVal} нед. подряд (≥${settings.streakThreshold}/7)`;
+        meta.appendChild(s);
+      }
+
+      if (state.habits.length > 1) {
+        const del = document.createElement("button");
+        del.className = "del-btn";
+        del.title = "Удалить привычку";
+        del.setAttribute("aria-label", "Удалить привычку " + (hIdx + 1));
+        del.textContent = "✕";
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (confirm(`Удалить привычку «${habit.name || "без названия"}»?`)) {
+            state.habits.splice(hIdx, 1);
+            saveState(); render(); toast("Привычка удалена");
+          }
+        });
+        meta.appendChild(del);
+      }
+
+      nameCell.appendChild(input);
+      nameCell.appendChild(meta);
+      el.grid.appendChild(nameCell);
+
+      days.forEach((checked, dIdx) => {
+        const cell = document.createElement("div");
+        cell.className = "cell day" + (checked ? " checked" : "") + (dIdx === tIdx ? " today" : "");
+        cell.setAttribute("role", "checkbox");
+        cell.setAttribute("aria-checked", String(checked));
+        cell.setAttribute("aria-label", `${habit.name || "Привычка"} — ${labels[dIdx]}`);
+        cell.tabIndex = 0;
+
+        const box = document.createElement("div");
+        box.className = "box";
+        box.innerHTML = CHECK_SVG;
+        cell.appendChild(box);
+
+        const toggle = () => {
+          days[dIdx] = !days[dIdx];
+          saveState();
+          if (days[dIdx]) {
+            cell.classList.add("just-checked");
+            setTimeout(() => cell.classList.remove("just-checked"), 350);
+          }
+          render();
+        };
+        cell.addEventListener("click", toggle);
+        cell.addEventListener("keydown", (e) => {
+          if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(); }
+        });
+        el.grid.appendChild(cell);
+      });
+    });
+
+    // Пустое состояние
+    const isEmpty = state.habits.length === 0;
+    el.emptyState.hidden = !isEmpty;
+    el.grid.style.display = isEmpty ? "none" : "";
+
+    updateProgress();
+    updateWeekHeader();
+    updateNavButtons();
+    renderChart();
+    updateQuoteBanner();
+  }
+
+  function updateProgress() {
+    const total = Math.max(1, state.habits.length * TOTAL_DAYS);
+    const done = totalChecked();
+    const pct = Math.round((done / total) * 100);
+    el.progressFill.style.width = pct + "%";
+    el.progressPct.textContent = pct + "%";
+  }
+  function updateWeekHeader() {
+    const start = currentWeekStart();
+    const end = new Date(start); end.setDate(end.getDate() + 6);
+    el.weekRange.textContent = `${fmtDate(start)} — ${fmtDate(end)}`;
+    if (state.offset === 0) el.weekTitle.textContent = "Текущая неделя";
+    else if (state.offset === -1) el.weekTitle.textContent = "Прошлая неделя";
+    else if (state.offset === 1) el.weekTitle.textContent = "Следующая неделя";
+    else if (state.offset < 0) el.weekTitle.textContent = `${Math.abs(state.offset)} нед. назад`;
+    else el.weekTitle.textContent = `+${state.offset} нед. вперёд`;
+  }
+  function updateNavButtons() {
+    el.prevBtn.disabled = state.offset <= -MAX_WEEKS_SHIFT;
+    el.nextBtn.disabled = state.offset >= MAX_WEEKS_SHIFT;
+  }
+
+  /* ---------- Навигация ---------- */
+  el.prevBtn.addEventListener("click", () => {
+    if (state.offset <= -MAX_WEEKS_SHIFT) return;
+    state.offset -= 1; saveState(); render();
+  });
+  el.nextBtn.addEventListener("click", () => {
+    if (state.offset >= MAX_WEEKS_SHIFT) return;
+    state.offset += 1; saveState(); render();
+  });
+
+  /* ---------- Свайпы ---------- */
+  let touchStartX = null;
+  el.tracker.addEventListener("touchstart", (e) => { touchStartX = e.touches[0].clientX; }, { passive: true });
+  el.tracker.addEventListener("touchend", (e) => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    touchStartX = null;
+    if (Math.abs(dx) < 60) return;
+    if (dx < 0) el.nextBtn.click();
+    else el.prevBtn.click();
+  }, { passive: true });
+
+  /* ---------- График ---------- */
+  function renderChart() {
+    el.chart.innerHTML = "";
+    const start = startOfWeek(new Date());
+    start.setDate(start.getDate() - (CHART_WEEKS - 1) * 7);
+    const total = Math.max(1, state.habits.length * TOTAL_DAYS);
+
+    for (let i = 0; i < CHART_WEEKS; i++) {
+      const wk = weekKey(start);
+      let done = 0;
+      state.habits.forEach(h => {
+        const days = h.weeks[wk] || [];
+        done += days.filter(Boolean).length;
+      });
+      const pct = Math.round((done / total) * 100);
+
+      const wrap = document.createElement("div");
+      wrap.className = "bar-wrap";
+      const bar = document.createElement("div");
+      bar.className = "bar" + (i === CHART_WEEKS - 1 ? " current" : "");
+      bar.style.height = Math.max(pct, 2) + "%";
+      bar.title = `${pct}% (${fmtDate(start)})`;
+      const label = document.createElement("div");
+      label.className = "bar-label";
+      label.textContent = i === CHART_WEEKS - 1 ? "сейчас" : fmtDate(start);
+      wrap.appendChild(bar); wrap.appendChild(label);
+      el.chart.appendChild(wrap);
+
+      start.setDate(start.getDate() + 7);
+    }
+  }
+
+  /* ---------- Цитата дня ---------- */
+  function updateQuoteBanner() {
+    const quotes = activeQuotes();
+    const jsDay = new Date().getDay();
+    // Приводим к индексу относительно первого дня недели
+    const idx = (jsDay - settings.firstDay + 7) % 7;
+    const q = quotes[idx] || quotes[0] || { emoji:"💪", text:"Движение — это жизнь.", author:"Народная мудрость" };
+    el.quoteEmoji.textContent = q.emoji || "💪";
+    el.quoteText.textContent = q.text || "";
+    el.quoteAuthor.textContent = "— " + (q.author || "");
+  }
+
+  /* ---------- Тема ---------- */
+  function applyTheme(theme) {
+    if (theme === "light") { document.body.classList.add("light"); el.themeBtn.textContent = "☀️"; }
+    else { document.body.classList.remove("light"); el.themeBtn.textContent = "🌙"; }
+  }
+  function initTheme() {
+    const saved = storage.get(THEME_KEY);
+    const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+    applyTheme(saved || (prefersLight ? "light" : "dark"));
+  }
+  el.themeBtn.addEventListener("click", () => {
+    const isLight = document.body.classList.contains("light");
+    const next = isLight ? "dark" : "light";
+    applyTheme(next);
+    storage.set(THEME_KEY, next);
+  });
+
+  /* ---------- Добавление привычки ---------- */
+  function addHabit() {
+    if (state.habits.length >= MAX_HABITS) { toast(`Максимум ${MAX_HABITS} привычек`, "error"); return; }
+    state.habits.push({ name: "", weeks: {} });
+    saveState(); render();
+    // Фокус на новом input
+    const inputs = el.grid.querySelectorAll(".habit-input");
+    const last = inputs[inputs.length - 1];
+    if (last) { last.focus(); last.select(); }
+    toast("Привычка добавлена", "success");
+  }
+  el.addHabitBtn.addEventListener("click", addHabit);
+  el.emptyAddBtn.addEventListener("click", addHabit);
+
+  /* ---------- Настройки (модалка) ---------- */
+  function openSettings() {
+    el.firstDay.value = String(settings.firstDay);
+    el.streakThreshold.value = String(settings.streakThreshold);
+    el.customQuotes.value = settings.customQuotes ? JSON.stringify(settings.customQuotes, null, 2) : "";
+    el.settingsModal.classList.add("open");
+  }
+  function closeSettings() { el.settingsModal.classList.remove("open"); }
+  el.settingsBtn.addEventListener("click", openSettings);
+  el.settingsCancel.addEventListener("click", closeSettings);
+  el.settingsModal.addEventListener("click", (e) => { if (e.target === el.settingsModal) closeSettings(); });
+  el.settingsSave.addEventListener("click", () => {
+    const fd = parseInt(el.firstDay.value, 10) === 0 ? 0 : 1;
+    const th = Math.min(7, Math.max(1, parseInt(el.streakThreshold.value, 10) || 5));
+    let cq = null;
+    const raw = el.customQuotes.value.trim();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed) || !parsed.length) throw new Error("нужен непустой массив");
+        parsed.forEach((q, i) => {
+          if (!q || typeof q.text !== "string") throw new Error(`цитата #${i+1}: нет поля text`);
+        });
+        cq = parsed;
+      } catch (err) {
+        toast("Цитаты: " + err.message, "error");
+        return;
+      }
+    }
+    settings = { firstDay: fd, streakThreshold: th, customQuotes: cq };
+    saveSettings(); closeSettings(); render();
+    toast("Настройки сохранены", "success");
+  });
+
+  /* ---------- Экспорт / импорт ---------- */
+  el.exportBtn.addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `habit-tracker-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast("JSON экспортирован", "success");
+  });
+
+  el.exportCsvBtn.addEventListener("click", () => {
+    const rows = [["habit", ...dayLabels()].join(",")];
+    state.habits.forEach(h => {
+      const days = getWeekDays(h);
+      rows.push([`"${(h.name || "").replace(/"/g,'""')}"`, ...days.map(v => v ? "1" : "0")].join(","));
+    });
+    const blob = new Blob(["\uFEFF" + rows.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `habit-tracker-${weekKey(currentWeekStart())}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast("CSV экспортирован", "success");
+  });
+
+  el.importBtn.addEventListener("click", () => el.importFile.click());
+  el.importFile.addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    el.importFile.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed || !Array.isArray(parsed.habits) || parsed.habits.length < 1) {
+        throw new Error("В файле нет массива habits");
+      }
+      const habits = parsed.habits.slice(0, MAX_HABITS).map((h, i) => {
+        if (!h || typeof h !== "object") throw new Error(`Привычка #${i+1} не объект`);
+        if (h.weeks && typeof h.weeks === "object") {
+          for (const k in h.weeks) {
+            const arr = h.weeks[k];
+            if (arr !== undefined && (!Array.isArray(arr) || arr.length !== TOTAL_DAYS)) {
+              throw new Error(`Привычка #${i+1}: неделя ${k} должна быть массивом из 7`);
+            }
+          }
+        }
+        return normalizeHabit(h);
+      });
+      if (!confirm("Импорт заменит текущие данные. Продолжить?")) return;
+      state = { offset: Number.isInteger(parsed.offset) ? parsed.offset : 0, habits };
+      saveState(); render();
+      toast("Данные загружены", "success");
+    } catch (err) {
+      toast("Импорт: " + err.message, "error");
+    }
+  });
+
+  /* ---------- PWA: manifest и service worker (inline) ---------- */
+  function setupPWA() {
+    try {
+      const manifest = {
+        name: "Трекер привычек", short_name: "Трекер",
+        start_url: ".", display: "standalone",
+        background_color: "#0f1115", theme_color: "#0f1115",
+        icons: [{
+          src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%234ade80'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle'%3E%E2%9C%85%3C/text%3E%3C/svg%3E",
+          sizes: "any", type: "image/svg+xml", purpose: "any"
+        }]
+      };
+      const mUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" }));
+      const link = document.createElement("link");
+      link.rel = "manifest"; link.href = mUrl;
+      document.head.appendChild(link);
+
+      if ("serviceWorker" in navigator) {
+        const swCode = `
+          const CACHE = "habit-tracker-v1";
+          self.addEventListener("install", (e) => {
+            self.skipWaiting();
+            e.waitUntil(caches.open(CACHE).then(c => c.addAll(["./", "./index.html"])).catch(()=>{}));
+          });
+          self.addEventListener("activate", (e) => {
+            e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+          });
+          self.addEventListener("fetch", (e) => {
+            if (e.request.method !== "GET") return;
+            e.respondWith(
+              caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
+                const copy = resp.clone();
+                caches.open(CACHE).then(c => c.put(e.request, copy)).catch(()=>{});
+                return resp;
+              }).catch(() => caches.match("./index.html")))
+            );
+          });
+        `;
+        const swUrl = URL.createObjectURL(new Blob([swCode], { type: "application/javascript" }));
+        navigator.serviceWorker.register(swUrl).catch(() => {/* офлайн-режим недоступен */});
+      }
+    } catch (e) {
+      console.warn("PWA не инициализирован:", e);
+    }
+  }
+
+  /* ---------- Старт ---------- */
+  initTheme();
+  render();
+  setupPWA();
+});
+</script>
+</body>
+</html>
